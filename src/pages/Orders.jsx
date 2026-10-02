@@ -3,10 +3,11 @@ import { useParams, useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { Card, Button, Badge, StatusBadge, Table, TableHeader, TableHead, TableBody, TableRow, TableCell, Modal, ConfirmDialog, SearchInput, Select, EmptyState, Skeleton, Input, Textarea } from '../components/ui'
 import { fmt, fmtDateTime, fmtDate, timeAgo } from '../lib/utils'
+import { InvoicePdf } from '../lib/invoicePdf'
 import { ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants'
 import { useToast } from '../hooks/useToast'
 import { useDebouncedValue } from '../hooks/useDebouncedValue'
-import { ShoppingCart, Eye, X, Truck, MapPin, Phone, Mail, User, Package, Clock, CheckCircle, XCircle, RotateCcw, Printer, ChevronRight, Copy } from 'lucide-react'
+import { ShoppingCart, Eye, X, Truck, MapPin, Phone, Mail, User, Package, Clock, CheckCircle, XCircle, RotateCcw, Printer, ChevronRight, Copy, Download } from 'lucide-react'
 
 function OrderDetail({ orderId, onClose, onStatusChange }) {
   const [order, setOrder] = useState(null)
@@ -102,6 +103,33 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
     }
   }
 
+  const handleDownloadPdf = () => {
+    if (!order) return
+    const snap = order.address_snapshot || {}
+    const lines = [
+      snap.address || snap.address_line || '',
+      [snap.city, snap.district].filter(Boolean).join(', '),
+      order.customer_phone ? `Phone: ${order.customer_phone}` : '',
+      (order.note || snap.note) ? `Note: ${order.note || snap.note}` : '',
+    ].filter(Boolean)
+    InvoicePdf.download({
+      orderNumber: order.order_number,
+      dateStr: fmtDate(order.created_at),
+      customerName: order.customer_name || '',
+      addressLines: lines,
+      items: items.map(i => ({
+        name: i.product_name, qty: i.quantity,
+        unitPrice: Number(i.unit_price), lineTotal: Number(i.total_price),
+      })),
+      subtotal: Number(order.subtotal),
+      discount: Number(order.discount_amount),
+      deliveryFee: Number(order.delivery_fee),
+      total: Number(order.total_amount),
+      paymentLabel: 'Cash on Delivery',
+      statusLabel: ORDER_STATUSES.find(s => s.value === order.order_status)?.label || order.order_status,
+    })
+  }
+
   const handlePrint = () => {
     const printWindow = window.open('', '_blank')
     printWindow.document.write(`
@@ -139,6 +167,7 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
           <StatusBadge status={order.payment_status} statuses={PAYMENT_STATUSES} />
           <span className="text-sm text-gray-400">{timeAgo(order.created_at)}</span>
           <div className="ml-auto flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleDownloadPdf}><Download className="w-4 h-4" /> Download PDF</Button>
             <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="w-4 h-4" /> Print</Button>
           </div>
         </div>
