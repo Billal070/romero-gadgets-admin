@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { supabase } from '../lib/supabase'
 import { Card, Button, Badge, Table, TableHeader, TableHead, TableBody, TableRow, TableCell, Modal, SearchInput, Select, EmptyState, Skeleton, ConfirmDialog } from '../components/ui'
 import { fmt, fmtDateTime, timeAgo } from '../lib/utils'
@@ -106,14 +107,17 @@ export default function Customers() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
 
+  const debouncedSearch = useDebouncedValue(search)
+  const safeSearch = debouncedSearch.replace(/[,()]/g, '').trim()
+
   const loadCustomers = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('customers').select('*').order('created_at', { ascending: false })
-    if (search) query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%`)
+    if (safeSearch) query = query.or(`full_name.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`)
     const { data } = await query.limit(100)
     setCustomers(data || [])
     setLoading(false)
-  }, [search])
+  }, [safeSearch])
 
   useEffect(() => { loadCustomers() }, [loadCustomers])
 

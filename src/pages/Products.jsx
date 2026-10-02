@@ -5,6 +5,7 @@ import ProductImageManager from '../components/ProductImageManager'
 import { deleteProductImageObjects } from '../lib/productImages'
 import { fmt, slugify } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
 import { Package, Plus, Edit, Trash2, Star, Eye, EyeOff, Check, X } from 'lucide-react'
 
 function ProductForm({ product, onClose, onSave }) {
@@ -159,10 +160,13 @@ export default function Products() {
   const perPage = 15
   const { addToast } = useToast()
 
+  const debouncedSearch = useDebouncedValue(search)
+  const safeSearch = debouncedSearch.replace(/[,()]/g, '').trim()
+
   const loadProducts = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('products').select('*, categories(name)', { count: 'exact' }).order('created_at', { ascending: false })
-    if (search) query = query.or(`name.ilike.%${search}%,sku.ilike.%${search}%`)
+    if (safeSearch) query = query.or(`name.ilike.%${safeSearch}%,sku.ilike.%${safeSearch}%`)
     if (categoryFilter) query = query.eq('category_id', categoryFilter)
     if (statusFilter === 'active') query = query.eq('is_active', true)
     if (statusFilter === 'inactive') query = query.eq('is_active', false)
@@ -170,9 +174,10 @@ export default function Products() {
     setProducts(data || [])
     setTotal(count || 0)
     setLoading(false)
-  }, [page, search, categoryFilter, statusFilter])
+  }, [page, safeSearch, categoryFilter, statusFilter])
 
   useEffect(() => { loadProducts() }, [loadProducts])
+  useEffect(() => { setPage(1) }, [safeSearch])
 
   useEffect(() => {
     supabase.from('categories').select('id, name').eq('is_active', true).then(({ data }) => setCategories(data || []))

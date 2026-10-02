@@ -5,7 +5,8 @@ import { Card, Button, Badge, StatusBadge, Table, TableHeader, TableHead, TableB
 import { fmt, fmtDateTime, fmtDate, timeAgo } from '../lib/utils'
 import { ORDER_STATUSES, PAYMENT_STATUSES } from '../lib/constants'
 import { useToast } from '../hooks/useToast'
-import { ShoppingCart, Eye, X, Truck, MapPin, Phone, Mail, User, Package, Clock, CheckCircle, XCircle, RotateCcw, Printer, ChevronRight } from 'lucide-react'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { ShoppingCart, Eye, X, Truck, MapPin, Phone, Mail, User, Package, Clock, CheckCircle, XCircle, RotateCcw, Printer, ChevronRight, Copy } from 'lucide-react'
 
 function OrderDetail({ orderId, onClose, onStatusChange }) {
   const [order, setOrder] = useState(null)
@@ -60,6 +61,24 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
     }
   }
 
+  const copyText = async (text, label) => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        ta.remove()
+      }
+      addToast(`${label} copied`)
+    } catch {
+      addToast('Copy failed', 'error')
+    }
+  }
+
   const handlePrint = () => {
     const printWindow = window.open('', '_blank')
     printWindow.document.write(`
@@ -104,14 +123,39 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <h4 className="text-sm font-bold text-navy-900 mb-3">Customer Information</h4>
-            <div className="space-y-2.5">
-              <div className="flex items-center gap-2.5 text-sm"><User className="w-4 h-4 text-gray-400" /><span className="font-medium">{order.customer_name}</span></div>
-              <div className="flex items-center gap-2.5 text-sm"><Phone className="w-4 h-4 text-gray-400" /><span>{order.customer_phone}</span></div>
-              {order.customer_email && <div className="flex items-center gap-2.5 text-sm"><Mail className="w-4 h-4 text-gray-400" /><span>{order.customer_email}</span></div>}
-              {order.address_snapshot && (
-                <div className="flex items-start gap-2.5 text-sm"><MapPin className="w-4 h-4 text-gray-400 mt-0.5" /><span>{order.address_snapshot.address_line}, {order.address_snapshot.district}</span></div>
-              )}
-            </div>
+            {(() => {
+              const snap = order.address_snapshot || {};
+              const fullAddress = [
+                snap.address || snap.address_line,
+                snap.city,
+                snap.district,
+                snap.postal_code,
+              ].filter(Boolean).join(', ');
+              return (
+                <div className="space-y-2.5">
+                  <div className="flex items-center gap-2.5 text-sm"><User className="w-4 h-4 text-gray-400" /><span className="font-medium">{order.customer_name}</span></div>
+                  <div className="flex items-center gap-2.5 text-sm">
+                    <Phone className="w-4 h-4 text-gray-400" /><span>{order.customer_phone}</span>
+                    <button onClick={() => copyText(order.customer_phone, 'Phone')} className="p-1 rounded-md hover:bg-gray-100 text-gray-400 hover:text-brand-500" title="Copy phone" aria-label="Copy phone">
+                      <Copy className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {order.customer_email && <div className="flex items-center gap-2.5 text-sm"><Mail className="w-4 h-4 text-gray-400" /><span>{order.customer_email}</span></div>}
+                  {(snap.address || snap.address_line) && (
+                    <div className="flex items-start gap-2.5 text-sm"><MapPin className="w-4 h-4 text-gray-400 mt-0.5" /><span>{snap.address || snap.address_line}</span></div>
+                  )}
+                  {snap.district && <div className="flex items-center gap-2.5 text-sm"><span className="w-4" /><span><span className="text-gray-400">District: </span>{snap.district}</span></div>}
+                  {snap.city && <div className="flex items-center gap-2.5 text-sm"><span className="w-4" /><span><span className="text-gray-400">City: </span>{snap.city}</span></div>}
+                  {snap.postal_code && <div className="flex items-center gap-2.5 text-sm"><span className="w-4" /><span><span className="text-gray-400">Postal code: </span>{snap.postal_code}</span></div>}
+                  {(order.note || snap.note) && <div className="flex items-start gap-2.5 text-sm"><span className="w-4" /><span><span className="text-gray-400">Note: </span>{order.note || snap.note}</span></div>}
+                  {fullAddress && (
+                    <button onClick={() => copyText(`${order.customer_name}, ${order.customer_phone}, ${fullAddress}`, 'Full address')} className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-1.5 rounded-lg border border-gray-200 text-xs font-semibold text-gray-600 hover:bg-gray-50 hover:text-brand-500">
+                      <Copy className="w-3.5 h-3.5" /> Copy full address
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           <div>
             <h4 className="text-sm font-bold text-navy-900 mb-3">Order Summary</h4>
@@ -207,20 +251,24 @@ export default function Orders() {
   const perPage = 15
   const { addToast } = useToast()
 
+  const debouncedSearch = useDebouncedValue(search)
+  const safeSearch = debouncedSearch.replace(/[,()]/g, '').trim()
+
   const loadOrders = useCallback(async () => {
     setLoading(true)
     let query = supabase.from('orders').select('*', { count: 'exact' }).order('created_at', { ascending: false })
 
     if (statusFilter) query = query.eq('order_status', statusFilter)
-    if (search) query = query.or(`order_number.ilike.%${search}%,customer_name.ilike.%${search}%,customer_phone.ilike.%${search}%`)
+    if (safeSearch) query = query.or(`order_number.ilike.%${safeSearch}%,customer_name.ilike.%${safeSearch}%,customer_phone.ilike.%${safeSearch}%`)
 
     const { data, count } = await query.range((page - 1) * perPage, page * perPage - 1)
     setOrders(data || [])
     setTotal(count || 0)
     setLoading(false)
-  }, [page, statusFilter, search])
+  }, [page, statusFilter, safeSearch])
 
   useEffect(() => { loadOrders() }, [loadOrders])
+  useEffect(() => { setPage(1) }, [safeSearch])
 
   const totalPages = Math.ceil(total / perPage)
 
