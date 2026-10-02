@@ -236,8 +236,13 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
                   {i < history.length - 1 && <div className="w-0.5 h-6 bg-gray-200" />}
                 </div>
                 <div className="flex-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <StatusBadge status={h.to_status} statuses={ORDER_STATUSES} />
+                    {h.to_status === 'cancelled' && (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-navy-100 text-navy-700">
+                        {h.note === 'Cancelled by customer' ? 'Cancelled by Customer' : 'Cancelled by Admin'}
+                      </span>
+                    )}
                     <span className="text-xs text-gray-400">{fmtDateTime(h.created_at)}</span>
                   </div>
                   {h.note && <p className="text-xs text-gray-500 mt-0.5">{h.note}</p>}
