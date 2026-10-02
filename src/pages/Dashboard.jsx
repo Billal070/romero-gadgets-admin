@@ -41,7 +41,7 @@ export default function Dashboard() {
     setTopProducts(topProductsRes.data || [])
     setRecentReviews(reviewsRes.data || [])
     setLowStock(lowStockRes.data || [])
-    setChartData(chartRes.data || [])
+    setChartData(chartRes.data?.series ?? [])
     setLoading(false)
   }, [range])
 
