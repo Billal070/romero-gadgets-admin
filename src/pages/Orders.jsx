@@ -17,12 +17,21 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
   const [updating, setUpdating] = useState(false)
   const { addToast } = useToast()
 
+  const primaryImage = (product) => {
+    const images = product?.product_images
+    if (!images?.length) return null
+    const [first] = [...images].sort(
+      (a, b) => Number(b.is_primary) - Number(a.is_primary) || a.sort_order - b.sort_order
+    )
+    return first.image_url
+  }
+
   const loadOrder = useCallback(async () => {
     if (!orderId) return
     setLoading(true)
     const [orderRes, itemsRes, historyRes] = await Promise.all([
       supabase.from('orders').select('*').eq('id', orderId).single(),
-      supabase.from('order_items').select('*, products(name, image_url)').eq('order_id', orderId),
+      supabase.from('order_items').select('*, products(name, product_images(image_url, is_primary, sort_order))').eq('order_id', orderId),
       supabase.from('order_status_history').select('*').eq('order_id', orderId).order('created_at', { ascending: false })
     ])
     setOrder(orderRes.data)
@@ -121,14 +130,17 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
             <Table>
               <TableHeader><TableHead>Product</TableHead><TableHead>Qty</TableHead><TableHead>Price</TableHead><TableHead className="text-right">Total</TableHead></TableHeader>
               <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell><div className="flex items-center gap-3">{item.products?.image_url && <img src={item.products.image_url} alt="" className="w-10 h-10 rounded-lg object-cover" />}<span className="font-medium">{item.product_name}</span></div></TableCell>
-                    <TableCell>{item.quantity}</TableCell>
-                    <TableCell>{fmt(item.unit_price)}</TableCell>
-                    <TableCell className="text-right font-semibold">{fmt(item.total_price)}</TableCell>
-                  </TableRow>
-                ))}
+                {items.map((item) => {
+                  const image = primaryImage(item.products)
+                  return (
+                    <TableRow key={item.id}>
+                      <TableCell><div className="flex items-center gap-3">{image && <img src={image} alt="" className="w-10 h-10 rounded-lg object-cover" />}<span className="font-medium">{item.product_name}</span></div></TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>{fmt(item.unit_price)}</TableCell>
+                      <TableCell className="text-right font-semibold">{fmt(item.total_price)}</TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           </div>
