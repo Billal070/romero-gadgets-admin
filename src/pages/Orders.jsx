@@ -47,18 +47,41 @@ function OrderDetail({ orderId, onClose, onStatusChange }) {
   const handleStatusUpdate = async () => {
     if (!newStatus || newStatus === order.order_status) return
     setUpdating(true)
+    // Never touch orders.note here: it holds the customer's delivery note.
     const { error } = await supabase
       .from('orders')
-      .update({ order_status: newStatus, note: note || order.note })
+      .update({ order_status: newStatus })
       .eq('id', orderId)
-    setUpdating(false)
     if (error) {
+      setUpdating(false)
       addToast('Failed to update status', 'error')
-    } else {
-      addToast('Order status updated')
-      loadOrder()
-      onStatusChange?.()
+      return
     }
+    // Staff notes belong on the auto-created status-history row.
+    const staffNote = note.trim()
+    if (staffNote) {
+      const { data: latest } = await supabase
+        .from('order_status_history')
+        .select('id')
+        .eq('order_id', orderId)
+        .eq('to_status', newStatus)
+        .is('note', null)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (latest?.id) {
+        const { error: noteError } = await supabase
+          .from('order_status_history')
+          .update({ note: staffNote })
+          .eq('id', latest.id)
+        if (noteError) addToast('Status updated, but the note was not saved', 'error')
+      }
+    }
+    setUpdating(false)
+    setNote('')
+    addToast('Order status updated')
+    loadOrder()
+    onStatusChange?.()
   }
 
   const copyText = async (text, label) => {
