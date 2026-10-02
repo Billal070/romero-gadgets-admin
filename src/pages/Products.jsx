@@ -1,6 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { Card, Button, Badge, Table, TableHeader, TableHead, TableBody, TableRow, TableCell, Modal, ConfirmDialog, SearchInput, Select, EmptyState, Skeleton, Input, Textarea, Pagination } from '../components/ui'
+import ProductImageManager from '../components/ProductImageManager'
+import { deleteProductImageObjects } from '../lib/productImages'
 import { fmt, slugify } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import { Package, Plus, Edit, Trash2, Star, Eye, EyeOff, Check, X } from 'lucide-react'
@@ -32,6 +34,7 @@ function ProductForm({ product, onClose, onSave }) {
   const [categories, setCategories] = useState([])
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
+  const imageManagerRef = useRef(null)
   const { addToast } = useToast()
 
   useEffect(() => {
@@ -65,10 +68,22 @@ function ProductForm({ product, onClose, onSave }) {
         features: form.features.split('\n').filter(Boolean),
         specifications: JSON.parse(form.specifications || '{}')
       }
-      const { error } = product
-        ? await supabase.from('products').update(payload).eq('id', product.id)
-        : await supabase.from('products').insert(payload)
-      if (error) throw error
+      let productId = product?.id
+      if (product) {
+        const { error } = await supabase.from('products').update(payload).eq('id', product.id)
+        if (error) throw error
+      } else {
+        const { data, error } = await supabase.from('products').insert(payload).select('id').single()
+        if (error) throw error
+        productId = data.id
+      }
+      try {
+        await imageManagerRef.current?.save(productId)
+      } catch (imageError) {
+        addToast(`Product saved, but images failed: ${imageError.message}`, 'error')
+        onSave()
+        return
+      }
       addToast(product ? 'Product updated' : 'Product created')
       onSave()
       onClose()
@@ -101,6 +116,7 @@ function ProductForm({ product, onClose, onSave }) {
         <Textarea label="Full Description" value={form.description} onChange={(e) => set('description', e.target.value)} rows={4} />
         <Textarea label="Features (one per line)" value={form.features} onChange={(e) => set('features', e.target.value)} rows={4} />
         <Textarea label="Specifications (JSON)" value={form.specifications} onChange={(e) => set('specifications', e.target.value)} rows={4} />
+        <ProductImageManager ref={imageManagerRef} productId={product?.id} />
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Input label="Meta Title" value={form.meta_title} onChange={(e) => set('meta_title', e.target.value)} />
           <Input label="Meta Description" value={form.meta_description} onChange={(e) => set('meta_description', e.target.value)} />
@@ -164,6 +180,11 @@ export default function Products() {
 
   const handleDelete = async () => {
     if (!deleteConfirm) return
+    try {
+      await deleteProductImageObjects(deleteConfirm.id)
+    } catch (cleanupError) {
+      addToast(`Product image cleanup warning: ${cleanupError.message}`, 'error')
+    }
     const { error } = await supabase.from('products').delete().eq('id', deleteConfirm.id)
     if (error) addToast('Failed to delete product', 'error')
     else { addToast('Product deleted'); loadProducts() }
