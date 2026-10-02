@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { Card, Button, Badge, Table, TableHeader, TableHead, TableBody, TableRow, TableCell, Modal, ConfirmDialog, SearchInput, Select, EmptyState, Skeleton } from '../components/ui'
 import { fmtDateTime } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
-import { Star as StarIcon, Check, X, Trash2, Eye } from 'lucide-react'
+import { Star, Check, X, Trash2, Eye } from 'lucide-react'
 
 export default function Reviews() {
   const [reviews, setReviews] = useState([])
@@ -75,7 +75,7 @@ export default function Reviews() {
         {loading ? (
           <div className="p-4 space-y-3">{[...Array(6)].map((_, i) => <Skeleton key={i} className="h-16" />)}</div>
         ) : reviews.length === 0 ? (
-          <EmptyState icon={StarIcon} title="No reviews" message="No reviews found." />
+          <EmptyState icon={Star} title="No reviews" message="No reviews found." />
         ) : (
           <div className="divide-y divide-gray-50">
             {reviews.map((r) => (
