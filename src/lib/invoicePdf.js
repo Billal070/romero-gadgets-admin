@@ -27,7 +27,8 @@ const InvoicePdf = (() => {
   const LINE = [0.88, 0.90, 0.93];
   const ROW_SHADE = [0.95, 0.96, 0.98];
 
-  const money = (n) => 'BDT ' + Number(n || 0).toLocaleString('en-US');
+  // Whole BDT: invoices never show fractional amounts.
+  const money = (n) => 'BDT ' + Math.round(Number(n || 0)).toLocaleString('en-US');
 
   // Keep every emitted byte inside WinAnsi (single-byte) range so
   // xref offsets stay exact. Non-latin glyphs become '?'.

@@ -5,7 +5,8 @@ export const fmtDate = (d) => {
   return new Date(d).toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'short',
-    year: 'numeric'
+    year: 'numeric',
+    timeZone: 'Asia/Dhaka'
   })
 }
 
@@ -16,7 +17,8 @@ export const fmtDateTime = (d) => {
     month: 'short',
     year: 'numeric',
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'Asia/Dhaka'
   })
 }
 
@@ -24,9 +26,20 @@ export const fmtTime = (d) => {
   if (!d) return '—'
   return new Date(d).toLocaleTimeString('en-GB', {
     hour: '2-digit',
-    minute: '2-digit'
+    minute: '2-digit',
+    timeZone: 'Asia/Dhaka'
   })
 }
+
+/* Business dates are Asia/Dhaka calendar days. */
+export const toDhakaDateInput = (value) => {
+  if (!value) return ''
+  return new Date(value).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
+}
+
+export const dhakaDayStart = (dateOnly) => (dateOnly ? `${dateOnly}T00:00:00+06:00` : null)
+
+export const dhakaDayEnd = (dateOnly) => (dateOnly ? `${dateOnly}T23:59:59+06:00` : null)
 
 export const timeAgo = (d) => {
   if (!d) return '—'

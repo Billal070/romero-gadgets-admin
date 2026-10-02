@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 import { Card, Button, Badge, Table, TableHeader, TableHead, TableBody, TableRow, TableCell, Modal, ConfirmDialog, Input, Select, EmptyState, Skeleton } from '../components/ui'
-import { fmt, fmtDate } from '../lib/utils'
+import { fmt, fmtDate, toDhakaDateInput, dhakaDayStart, dhakaDayEnd } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import { Tag, Plus, Edit, Trash2 } from 'lucide-react'
 
@@ -10,28 +10,61 @@ function CouponForm({ coupon, onClose, onSave }) {
     code: coupon?.code || '',
     description: coupon?.description || '',
     discount_type: coupon?.discount_type || 'percentage',
-    discount_value: coupon?.discount_value || '',
-    min_order_amount: coupon?.min_order_amount || 0,
-    max_discount_amount: coupon?.max_discount_amount || '',
-    usage_limit: coupon?.usage_limit || '',
-    starts_at: coupon?.starts_at?.slice(0, 10) || '',
-    expires_at: coupon?.expires_at?.slice(0, 10) || '',
+    discount_value: coupon?.discount_value ?? '',
+    min_order_amount: coupon?.min_order_amount ?? 0,
+    max_discount_amount: coupon?.max_discount_amount ?? '',
+    usage_limit: coupon?.usage_limit ?? '',
+    starts_at: toDhakaDateInput(coupon?.starts_at),
+    expires_at: toDhakaDateInput(coupon?.expires_at),
     is_active: coupon?.is_active ?? true
   })
   const [loading, setLoading] = useState(false)
+  const [errors, setErrors] = useState({})
   const { addToast } = useToast()
 
+  const isPercentage = form.discount_type === 'percentage'
+
+  const previewText = () => {
+    const v = Number(form.discount_value)
+    if (!form.discount_value || !(v > 0)) return ''
+    if (isPercentage) {
+      if (v > 100) return ''
+      return `${v}% OFF${form.max_discount_amount ? ` (capped at ৳${Number(form.max_discount_amount)})` : ''}${Number(form.min_order_amount) > 0 ? ` · min order ৳${Number(form.min_order_amount)}` : ''}`
+    }
+    return `৳${v} OFF${Number(form.min_order_amount) > 0 ? ` · min order ৳${Number(form.min_order_amount)}` : ''}`
+  }
+
   const handleSave = async () => {
-    if (!form.code.trim()) { addToast('Code is required', 'error'); return }
+    const e = {}
+    if (!form.code.trim()) e.code = 'Code is required'
+    const toInt = (value, { min = 0, allowEmpty = true } = {}) => {
+      if ((value === '' || value === null || value === undefined) && allowEmpty) return null
+      const n = Number(value)
+      if (!Number.isInteger(n) || n < min) return undefined
+      return n
+    }
+    const discountValue = toInt(form.discount_value, { allowEmpty: false, min: 1 })
+    if (discountValue === undefined) e.discount_value = isPercentage ? 'Whole number 1–100' : 'Whole BDT amount (min ৳1)'
+    else if (isPercentage && discountValue > 100) e.discount_value = 'Percentage cannot exceed 100'
+    const minOrder = toInt(form.min_order_amount, { allowEmpty: false, min: 0 })
+    if (minOrder === undefined) e.min_order_amount = 'Whole BDT amount (min ৳0)'
+    const maxDiscount = toInt(form.max_discount_amount, { allowEmpty: true, min: 1 })
+    if (maxDiscount === undefined) e.max_discount_amount = 'Whole BDT amount or empty'
+    const usageLimit = toInt(form.usage_limit, { allowEmpty: true, min: 1 })
+    if (usageLimit === undefined) e.usage_limit = 'Whole number or empty'
+    setErrors(e)
+    if (Object.keys(e).length) return
     setLoading(true)
     const payload = {
       ...form,
-      discount_value: Number(form.discount_value),
-      min_order_amount: Number(form.min_order_amount),
-      max_discount_amount: form.max_discount_amount ? Number(form.max_discount_amount) : null,
-      usage_limit: form.usage_limit ? Number(form.usage_limit) : null,
-      starts_at: form.starts_at || null,
-      expires_at: form.expires_at || null
+      discount_value: discountValue,
+      min_order_amount: minOrder ?? 0,
+      max_discount_amount: isPercentage ? maxDiscount : null,
+      usage_limit: usageLimit,
+      // Date-only inputs are Bangladesh calendar days: start of day
+      // for starts_at, end of day for expires_at (Asia/Dhaka).
+      starts_at: dhakaDayStart(form.starts_at),
+      expires_at: dhakaDayEnd(form.expires_at)
     }
     const { error } = coupon
       ? await supabase.from('coupons').update(payload).eq('id', coupon.id)
@@ -45,19 +78,24 @@ function CouponForm({ coupon, onClose, onSave }) {
     <Modal open onClose={onClose} title={coupon ? 'Edit Coupon' : 'Add Coupon'} size="lg">
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
-          <Input label="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} required />
+          <Input label="Code" value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} error={errors.code} required />
           <Select label="Discount Type" value={form.discount_type} onChange={(e) => setForm({ ...form, discount_type: e.target.value })}>
             <option value="percentage">Percentage (%)</option>
             <option value="fixed">Fixed Amount (৳)</option>
           </Select>
-          <Input label="Discount Value" type="number" value={form.discount_value} onChange={(e) => setForm({ ...form, discount_value: e.target.value })} required />
-          <Input label="Min Order Amount" type="number" value={form.min_order_amount} onChange={(e) => setForm({ ...form, min_order_amount: e.target.value })} />
-          <Input label="Max Discount" type="number" value={form.max_discount_amount} onChange={(e) => setForm({ ...form, max_discount_amount: e.target.value })} />
-          <Input label="Usage Limit" type="number" value={form.usage_limit} onChange={(e) => setForm({ ...form, usage_limit: e.target.value })} />
+          <Input label={isPercentage ? 'Discount Value (%)' : 'Discount Value (৳)'} type="number" min="1" max={isPercentage ? 100 : undefined} step="1" value={form.discount_value} onChange={(e) => setForm({ ...form, discount_value: e.target.value })} error={errors.discount_value} required />
+          <Input label="Min Order Amount (৳)" type="number" min="0" step="1" value={form.min_order_amount} onChange={(e) => setForm({ ...form, min_order_amount: e.target.value })} error={errors.min_order_amount} />
+          <Input label={isPercentage ? 'Max Discount (৳, optional cap)' : 'Max Discount (not used for fixed)'} type="number" min="1" step="1" value={form.max_discount_amount} onChange={(e) => setForm({ ...form, max_discount_amount: e.target.value })} error={errors.max_discount_amount} disabled={!isPercentage} />
+          <Input label="Usage Limit (optional)" type="number" min="1" step="1" value={form.usage_limit} onChange={(e) => setForm({ ...form, usage_limit: e.target.value })} error={errors.usage_limit} />
           <Input label="Start Date" type="date" value={form.starts_at} onChange={(e) => setForm({ ...form, starts_at: e.target.value })} />
           <Input label="Expiry Date" type="date" value={form.expires_at} onChange={(e) => setForm({ ...form, expires_at: e.target.value })} />
         </div>
         <Input label="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        {previewText() && (
+          <div className="rounded-lg bg-brand-100 text-navy-900 text-sm font-semibold px-4 py-2.5">
+            Preview: {previewText()}
+          </div>
+        )}
         <label className="flex items-center gap-2 cursor-pointer">
           <input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-brand-500" />
           <span className="text-sm font-medium text-gray-700">Active</span>
