@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../context/AuthContext'
 import { useToast } from '../hooks/useToast'
+import { supabase } from '../lib/supabase'
 import { Dropdown, DropdownItem, Badge } from './ui'
 
 const sidebarGroups = [
