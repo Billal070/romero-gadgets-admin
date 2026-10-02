@@ -7,19 +7,33 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [adminUser, setAdminUser] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState(null)
 
   const checkAdmin = useCallback(async (userId) => {
     if (!userId) {
       setAdminUser(null)
-      return
+      setAuthError(null)
+      return null
     }
-    const { data } = await supabase
+    // maybeSingle, not single: single() raises PGRST116 when zero rows
+    // come back, which is the normal case for a valid auth user that has
+    // no admin_users row yet.
+    const { data, error } = await supabase
       .from('admin_users')
       .select('*, roles(name, permissions)')
       .eq('id', userId)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
+
+    if (error) {
+      setAdminUser(null)
+      setAuthError(error.message)
+      return null
+    }
+
     setAdminUser(data || null)
+    setAuthError(data ? null : 'This account is not registered as an admin.')
+    return data || null
   }, [])
 
   useEffect(() => {
@@ -63,6 +77,7 @@ export function AuthProvider({ children }) {
       session,
       adminUser,
       loading,
+      authError,
       isAdmin,
       permissions,
       roleName,

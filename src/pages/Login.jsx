@@ -5,7 +5,7 @@ import { Button, Input } from '../components/ui'
 import { Lock, Mail, AlertCircle } from 'lucide-react'
 
 export default function Login() {
-  const { isAdmin, signIn } = useAuth()
+  const { isAdmin, signIn, signOut, checkAdmin, authError } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [email, setEmail] = useState('')
@@ -22,7 +22,16 @@ export default function Login() {
     setError('')
     setLoading(true)
     try {
-      await signIn(email, password)
+      const { user } = await signIn(email, password)
+      // Resolve the admin row before navigating. Without this the
+      // router pushes to "/" and ProtectedRoute immediately bounces
+      // back to /login with no explanation.
+      const admin = await checkAdmin(user?.id)
+      if (!admin) {
+        setError('Signed in, but this account is not registered as an admin.')
+        await signOut()
+        return
+      }
       navigate(location.state?.from?.pathname || '/', { replace: true })
     } catch (err) {
       setError(err.message || 'Invalid email or password')
@@ -30,6 +39,8 @@ export default function Login() {
       setLoading(false)
     }
   }
+
+  const message = error || authError
 
   return (
     <div className="min-h-screen bg-navy-900 flex items-center justify-center p-4">
@@ -42,10 +53,10 @@ export default function Login() {
         <div className="bg-white rounded-2xl shadow-modal p-8">
           <h2 className="text-lg font-bold text-navy-900 mb-1">Welcome back</h2>
           <p className="text-sm text-gray-500 mb-6">Sign in to your admin account</p>
-          {error && (
+          {message && (
             <div className="flex items-center gap-2 bg-red-50 text-red-700 text-sm font-medium px-4 py-3 rounded-lg mb-5">
               <AlertCircle className="w-4 h-4 shrink-0" />
-              {error}
+              {message}
             </div>
           )}
           <form onSubmit={handleSubmit} className="space-y-4">
