@@ -71,12 +71,24 @@ function ProductForm({ product, onClose, onSave }) {
       }
       let productId = product?.id
       if (product) {
-        const { error } = await supabase.from('products').update(payload).eq('id', product.id)
-        if (error) throw error
+        let attempt = { ...payload }
+        for (let n = 0; n < 10; n++) {
+          if (n > 0) attempt = { ...payload, slug: `${payload.slug}-${n + 1}` }
+          const { error } = await supabase.from('products').update(attempt).eq('id', product.id)
+          if (!error) break
+          if (error.code !== '23505' || n === 9) throw error
+        }
       } else {
-        const { data, error } = await supabase.from('products').insert(payload).select('id').single()
-        if (error) throw error
-        productId = data.id
+        let attempt = { ...payload }
+        for (let n = 0; n < 10; n++) {
+          if (n > 0) attempt = { ...payload, slug: `${payload.slug}-${n + 1}` }
+          const { data, error } = await supabase.from('products').insert(attempt).select('id').single()
+          if (!error) {
+            productId = data.id
+            break
+          }
+          if (error.code !== '23505' || n === 9) throw error
+        }
       }
       try {
         await imageManagerRef.current?.save(productId)
