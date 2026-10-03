@@ -82,6 +82,25 @@ export default function Delivery() {
       </div>
 
       <Card>
+        <div className="px-6 pt-5">
+          <div className="flex flex-col sm:flex-row sm:items-end gap-3">
+            <Select
+              label="Quick edit zone"
+              value=""
+              onChange={(e) => {
+                const z = zones.find(x => x.id === e.target.value);
+                if (z) { setSelected(z); setShowForm(true); }
+                e.target.value = '';
+              }}
+              className="sm:w-72"
+            >
+              <option value="">Select a zone to edit its fee…</option>
+              {zones.filter(z => z.is_active).map((z) => (
+                <option key={z.id} value={z.id}>{z.name} — ৳{Number(z.fee)}</option>
+              ))}
+            </Select>
+          </div>
+        </div>
         {loading ? (
           <div className="p-4 space-y-3">{[...Array(3)].map((_, i) => <Skeleton key={i} className="h-12" />)}</div>
         ) : zones.length === 0 ? (
