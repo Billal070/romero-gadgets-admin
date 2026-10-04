@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
-import { Card, Button, Badge, Table, TableHeader, TableHead, TableBody, TableRow, TableCell, Modal, ConfirmDialog, Input, EmptyState, Skeleton } from '../components/ui'
+import { Card, Button, Badge, Table, TableHeader, TableHead, TableBody, TableRow, TableCell, Modal, ConfirmDialog, Input, Select, EmptyState, Skeleton } from '../components/ui'
 import { fmt } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import { Truck, Plus, Edit, Trash2 } from 'lucide-react'
