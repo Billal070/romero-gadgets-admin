@@ -5,6 +5,12 @@ import { fmt } from '../lib/utils'
 import { useToast } from '../hooks/useToast'
 import { Truck, Plus, Edit, Trash2 } from 'lucide-react'
 
+const BD_DISTRICTS = [
+  'Dhaka', 'Chattogram', 'Khulna', 'Rajshahi', 'Sylhet', 'Barishal', 'Rangpur', 'Mymensingh',
+  'Cumilla', 'Narayanganj', 'Gazipur', 'Bogura', 'Jashore', 'Dinajpur', 'Tangail', 'Jamalpur',
+  'Pabna', 'Noakhali', 'Faridpur', 'Kushtia', 'Patuakhali', 'Cox’s Bazar', 'Narsingdi', 'Brahmanbaria',
+];
+
 function ZoneForm({ zone, onClose, onSave }) {
   const [form, setForm] = useState({
     name: zone?.name || '',
@@ -30,7 +36,13 @@ function ZoneForm({ zone, onClose, onSave }) {
   return (
     <Modal open onClose={onClose} title={zone ? 'Edit Zone' : 'Add Zone'} size="sm">
       <div className="space-y-4">
-        <Input label="Zone Name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
+        <Select label="Zone / District" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required>
+          <option value="">Select district…</option>
+          {BD_DISTRICTS.map((d) => <option key={d} value={d}>{d}</option>)}
+          {form.name && !BD_DISTRICTS.includes(form.name) && (
+            <option value={form.name}>{form.name} (custom)</option>
+          )}
+        </Select>
         <Input label="Delivery Fee (৳)" type="number" value={form.fee} onChange={(e) => setForm({ ...form, fee: Number(e.target.value) })} />
         <Input label="Free Shipping Above (৳)" type="number" value={form.free_above} onChange={(e) => setForm({ ...form, free_above: Number(e.target.value) })} />
         <Input label="Estimated Days" value={form.estimated_days} onChange={(e) => setForm({ ...form, estimated_days: e.target.value })} placeholder="e.g. 1-2 days" />
